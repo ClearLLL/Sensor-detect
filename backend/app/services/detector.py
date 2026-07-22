@@ -6,10 +6,13 @@ import os
 import statistics
 import time
 from dataclasses import dataclass
+from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 
-DEFAULT_MODEL = "haywoodsloan/ai-image-detector-deploy"
+DEFAULT_MODEL = "chuangchuangtan/NPR-DeepfakeDetection"
+DEFAULT_WEIGHTS = Path(__file__).resolve().parents[2] / "models" / "NPR.pth"
 
 
 @dataclass(frozen=True)
@@ -23,20 +26,21 @@ class ImageInfo:
 
 class DetectorService:
     def __init__(self) -> None:
-        self.mode = os.getenv("SENSOR_DETECT_MODE", "demo").strip().lower()
+        self.mode = os.getenv("SENSOR_DETECT_MODE", "github").strip().lower()
         self.model_name = os.getenv("SENSOR_DETECT_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
-        self._pipeline: Any | None = None
+        self.weights_path = Path(os.getenv("SENSOR_DETECT_WEIGHTS", str(DEFAULT_WEIGHTS))).expanduser()
+        self._model: Any | None = None
         self._model_error: str | None = None
 
     def detect(self, image_bytes: bytes, image_info: ImageInfo) -> dict[str, Any]:
         started = time.perf_counter()
 
-        if self.mode in {"model", "auto"}:
+        if self.mode in {"github", "model", "auto"}:
             result = self._detect_with_model(image_bytes, image_info)
             if result is not None:
                 result["duration_ms"] = round((time.perf_counter() - started) * 1000, 2)
                 return result
-            if self.mode == "model":
+            if self.mode in {"github", "model"}:
                 return self._error_result(image_info, started)
 
         result = self._detect_demo(image_bytes, image_info)
@@ -45,82 +49,51 @@ class DetectorService:
 
     def _detect_with_model(self, image_bytes: bytes, image_info: ImageInfo) -> dict[str, Any] | None:
         try:
-            pipe = self._get_pipeline()
-            if pipe is None:
+            model = self._get_model()
+            if model is None:
                 return None
 
             from PIL import Image
-            from io import BytesIO
 
             image = Image.open(BytesIO(image_bytes)).convert("RGB")
-            predictions = pipe(image)
-            ai_probability, real_probability, raw = self._normalize_model_predictions(predictions)
+            ai_probability = model.predict_probability(image)
+            real_probability = 1.0 - ai_probability
             return self._format_result(
                 image_info=image_info,
                 ai_probability=ai_probability,
                 real_probability=real_probability,
-                mode="model",
+                mode="github",
                 model=self.model_name,
                 warnings=[
-                    "检测结果仅供参考，不能作为图片来源的唯一证据。",
-                    "压缩、裁剪、重采样和新生成模型都可能影响准确率。",
+                    "当前使用 GitHub 开源 NPR 模型推理，检测结果只能作为风险参考。",
+                    "压缩、裁剪、重采样和新一代生成模型可能影响准确率。",
                 ],
-                raw_predictions=raw,
+                raw_predictions=[
+                    {"label": "ai_generated", "score": ai_probability},
+                    {"label": "real_image", "score": real_probability},
+                ],
             )
         except Exception as exc:
             self._model_error = str(exc)
             return None
 
-    def _get_pipeline(self) -> Any | None:
-        if self._pipeline is not None:
-            return self._pipeline
+    def _get_model(self) -> Any | None:
+        if self._model is not None:
+            return self._model
         if self._model_error:
+            return None
+        if not self.weights_path.exists():
+            self._model_error = f"权重文件不存在：{self.weights_path}"
             return None
 
         try:
-            from transformers import pipeline
+            from .npr_detector import NPRDetector
 
-            self._pipeline = pipeline("image-classification", model=self.model_name)
-            return self._pipeline
+            self._model = NPRDetector(self.weights_path)
+            return self._model
         except Exception as exc:
             self._model_error = str(exc)
             return None
-
-    def _normalize_model_predictions(self, predictions: Any) -> tuple[float, float, list[dict[str, Any]]]:
-        raw: list[dict[str, Any]] = []
-        ai_score = 0.0
-        real_score = 0.0
-
-        if not isinstance(predictions, list):
-            predictions = []
-
-        for item in predictions:
-            if not isinstance(item, dict):
-                continue
-            label = str(item.get("label", "")).lower()
-            score = float(item.get("score", 0.0))
-            raw.append({"label": item.get("label"), "score": score})
-
-            if any(token in label for token in ("ai", "artificial", "fake", "generated", "synthetic")):
-                ai_score += score
-            elif any(token in label for token in ("real", "human", "natural", "authentic")):
-                real_score += score
-
-        if ai_score == 0 and real_score == 0 and raw:
-            top_label = str(raw[0].get("label", "")).lower()
-            top_score = float(raw[0].get("score", 0.0))
-            if "0" in top_label or "fake" in top_label:
-                ai_score = top_score
-                real_score = max(0.0, 1.0 - top_score)
-            else:
-                real_score = top_score
-                ai_score = max(0.0, 1.0 - top_score)
-
-        total = ai_score + real_score
-        if total <= 0:
-            return 0.5, 0.5, raw
-
-        return ai_score / total, real_score / total, raw
 
     def _detect_demo(self, image_bytes: bytes, image_info: ImageInfo) -> dict[str, Any]:
         digest = hashlib.sha256(image_bytes).digest()
@@ -150,7 +123,7 @@ class DetectorService:
             model="demo-local-image-signal",
             warnings=[
                 "当前是 demo 检测模式，只用于验证前后端链路，不代表真实 AI 图像检测结论。",
-                "安装模型依赖并设置 SENSOR_DETECT_MODE=model 后，会切换到真实图像分类模型推理。",
+                "下载 NPR.pth 并设置 SENSOR_DETECT_MODE=github 后，会切换到真实 GitHub 权重推理。",
             ],
             raw_predictions=[
                 {"label": "ai", "score": ai_probability},
@@ -203,8 +176,10 @@ class DetectorService:
         return {
             "ok": False,
             "error": "model_unavailable",
-            "message": "模型推理未能启动，请确认已安装 requirements.txt 并且模型可以下载。",
+            "message": "GitHub NPR 模型推理未能启动，请确认已安装 backend/requirements.txt，且 backend/models/NPR.pth 已下载完整。",
             "detail": self._model_error,
+            "mode": self.mode,
+            "model": self.model_name,
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             "image": {
                 "filename": image_info.filename,

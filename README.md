@@ -8,10 +8,10 @@ AI 生成图像检测网站的本地 MVP。
 - React + TypeScript 前端检测页面
 - 上传 PNG / JPEG / WebP / GIF 图片
 - 展示扫描动画、分析进度、AI 生成概率和异常信号
-- 返回统一的检测结果结构
-- 支持后续切换到 Hugging Face 图像分类模型推理
+- 后端默认使用 GitHub 开源 NPR 模型权重进行真实推理
+- 模型不可用时会返回明确错误，`auto` 模式可回退到 demo 结果
 
-当前默认使用 `demo` 检测模式，保证没有安装深度学习依赖时也能先跑通前后端链路。真实模型模式需要额外安装 `transformers`、`torch`、`Pillow`。
+当前接入的模型是 `chuangchuangtan/NPR-DeepfakeDetection`，权重文件为 `backend/models/NPR.pth`。它是基于 Neighboring Pixel Relationships 的深度伪造图像检测模型，适合作为本地 MVP 的真实检测后端起点。
 
 ## 快速启动
 
@@ -27,6 +27,34 @@ AI 生成图像检测网站的本地 MVP。
 http://[::1]:8000
 ```
 
+## 安装依赖
+
+```powershell
+python -m pip install -r backend\requirements.txt
+```
+
+## 模型权重
+
+本地已下载：
+
+```text
+backend/models/NPR.pth
+```
+
+权重来源：
+
+```text
+https://github.com/chuangchuangtan/NPR-DeepfakeDetection
+```
+
+如果重新克隆仓库后没有权重文件，可以从 GitHub raw 下载：
+
+```powershell
+python -c "from urllib.request import urlopen; from pathlib import Path; url='https://raw.githubusercontent.com/chuangchuangtan/NPR-DeepfakeDetection/main/NPR.pth'; out=Path('backend/models/NPR.pth'); out.parent.mkdir(parents=True, exist_ok=True); out.write_bytes(urlopen(url, timeout=120).read())"
+```
+
+第三方权重文件不会提交到本仓库。
+
 ## 前端开发
 
 前端位于 `frontend/`，技术栈为 React、TypeScript、Vite 和 CSS。
@@ -39,26 +67,28 @@ npm run build
 
 构建后，后端会优先托管 `frontend/dist`。
 
-## 启用真实模型推理
+## 切换模式
 
-先安装后端依赖：
-
-```powershell
-python -m pip install -r backend\requirements.txt
-```
-
-然后启动时设置：
+真实模型模式：
 
 ```powershell
-$env:SENSOR_DETECT_MODE="model"
-$env:SENSOR_DETECT_MODEL="haywoodsloan/ai-image-detector-deploy"
+$env:SENSOR_DETECT_MODE="github"
+$env:SENSOR_DETECT_MODEL="chuangchuangtan/NPR-DeepfakeDetection"
+$env:SENSOR_DETECT_WEIGHTS="backend/models/NPR.pth"
 python backend\app\main.py
 ```
 
-也可以保持 `auto`，服务会尝试加载模型，失败时回退到 demo 模式：
+自动回退模式：
 
 ```powershell
 $env:SENSOR_DETECT_MODE="auto"
+python backend\app\main.py
+```
+
+演示模式：
+
+```powershell
+$env:SENSOR_DETECT_MODE="demo"
 python backend\app\main.py
 ```
 
@@ -70,6 +100,9 @@ backend/
     main.py
     services/
       detector.py
+      npr_detector.py
+  models/
+    NPR.pth
 frontend/
   src/
     App.tsx

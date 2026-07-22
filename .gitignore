@@ -1,12 +1,19 @@
 __pycache__/
 *.pyc
+*.py[cod]
 .venv/
 venv/
 node_modules/
+frontend/node_modules/
 .env
 .DS_Store
 Thumbs.db
 
 *.tsbuildinfo
+frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+
+backend/models/*.pth
+backend/models/*.pt
+backend/models/*.safetensors

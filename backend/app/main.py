@@ -58,7 +58,7 @@ class SensorDetectHandler(BaseHTTPRequestHandler):
                 {
                     "mode": DETECTOR.mode,
                     "model": DETECTOR.model_name,
-                    "default_model": "haywoodsloan/ai-image-detector-deploy",
+                    "default_model": "chuangchuangtan/NPR-DeepfakeDetection",
                 }
             )
             return
@@ -260,5 +260,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
