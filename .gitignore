@@ -6,3 +6,7 @@ node_modules/
 .env
 .DS_Store
 Thumbs.db
+
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts

@@ -1,9 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import mimetypes
 import re
 import socket
+import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -17,7 +18,9 @@ from services.detector import DetectorService, ImageInfo
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-FRONTEND_DIR = ROOT_DIR / "frontend"
+FRONTEND_SOURCE_DIR = ROOT_DIR / "frontend"
+FRONTEND_DIST_DIR = FRONTEND_SOURCE_DIR / "dist"
+FRONTEND_DIR = FRONTEND_DIST_DIR if FRONTEND_DIST_DIR.exists() else FRONTEND_SOURCE_DIR
 HOST = "::1"
 PORT = 8000
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
