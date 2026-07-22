@@ -1,11 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties, DragEvent } from "react";
 
+type ModelInfo = {
+  id: string;
+  name: string;
+  kind: string;
+  source: string;
+  description: string;
+  weight: number;
+  available: boolean;
+  unavailable_reason?: string | null;
+};
+
+type ModelResult = {
+  id: string;
+  name: string;
+  kind: string;
+  source: string;
+  weight: number;
+  ai_probability: number;
+  real_probability: number;
+  result: "likely_ai" | "likely_real";
+  detail: string;
+};
+
 type HealthResponse = {
   ok: boolean;
   service: string;
   mode: string;
   model: string;
+  models?: ModelInfo[];
 };
 
 type DetectResponse = {
@@ -25,6 +49,9 @@ type DetectResponse = {
     height: number | null;
   };
   warnings: string[];
+  selected_models?: string[];
+  model_results?: ModelResult[];
+  model_errors?: { id: string; name: string; error: string }[];
 };
 
 type SignalState = "异常" | "关注" | "缺失" | "正常";
@@ -38,6 +65,7 @@ type Signal = {
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const DEFAULT_MODEL_IDS = ["npr", "frequency", "compression", "metadata"];
 
 const methodRows = [
   {
@@ -73,12 +101,21 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState("图片仅在本地预览 · 支持 JPG、PNG、WEBP");
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>(DEFAULT_MODEL_IDS);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetch("/api/health")
       .then((response) => response.json())
-      .then(setHealth)
+      .then((data: HealthResponse) => {
+        setHealth(data);
+        if (Array.isArray(data.models)) {
+          setAvailableModels(data.models);
+          const selectable = data.models.filter((model) => model.available).map((model) => model.id);
+          if (selectable.length) setSelectedModels(selectable);
+        }
+      })
       .catch(() => setHealth(null));
   }, []);
 
@@ -141,11 +178,16 @@ function App() {
 
   async function detectImage() {
     if (!file || isAnalyzing) return;
+    if (selectedModels.length === 0) {
+      setMessage("至少选择一个检测模型");
+      return;
+    }
     setIsAnalyzing(true);
     setMessage("正在扫描频域、纹理、边缘与元数据");
 
     const form = new FormData();
     form.append("image", file);
+    form.append("models", selectedModels.join(","));
 
     try {
       const response = await fetch("/api/detect", { method: "POST", body: form });
@@ -163,6 +205,15 @@ function App() {
     } finally {
       window.setTimeout(() => setIsAnalyzing(false), 360);
     }
+  }
+
+  function toggleModel(modelId: string) {
+    setSelectedModels((current) => {
+      if (current.includes(modelId)) {
+        return current.filter((id) => id !== modelId);
+      }
+      return [...current, modelId];
+    });
   }
 
   function resetImage() {
@@ -255,6 +306,31 @@ function App() {
               <div className="bar-scale"><span>0%</span><em>判定阈值 {threshold}%</em><span>100%</span></div>
               <div className="verdict-line">△ {verdict}</div>
 
+              <div className="model-picker" aria-label="选择检测模型">
+                {(availableModels.length ? availableModels : fallbackModels()).map((model) => (
+                  <label key={model.id} className={model.available ? "" : "disabled"} title={model.description}>
+                    <input
+                      type="checkbox"
+                      checked={selectedModels.includes(model.id)}
+                      disabled={!model.available || isAnalyzing}
+                      onChange={() => toggleModel(model.id)}
+                    />
+                    <span>{model.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              {result?.model_results?.length ? (
+                <div className="model-results">
+                  {result.model_results.map((item) => (
+                    <div key={item.id}>
+                      <span>{item.name}</span>
+                      <strong>{formatProbability(item.ai_probability)}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="signals">
                 {signals.map((signal) => (
                   <div className={`signal-row ${signal.state}`} key={signal.key}>
@@ -275,7 +351,7 @@ function App() {
           <div className="analysis-footer">
             <span>{file?.name ?? "images.webp"}</span>
             <span>颜色空间 sRGB</span>
-            <span>分析模式 MULTI-04</span>
+            <span>模型 {selectedModels.length > 1 ? `ENSEMBLE-${selectedModels.length}` : selectedModels[0]?.toUpperCase() ?? "NONE"}</span>
             <button type="button" onClick={file ? resetImage : () => fileInputRef.current?.click()}>
               更换图片 ↗
             </button>
@@ -337,6 +413,18 @@ function App() {
       </footer>
     </main>
   );
+}
+
+function fallbackModels(): ModelInfo[] {
+  return DEFAULT_MODEL_IDS.map((id) => ({
+    id,
+    name: id === "npr" ? "NPR 深度模型" : id === "frequency" ? "频域残差模型" : id === "compression" ? "压缩痕迹模型" : "元数据来源模型",
+    kind: id === "npr" ? "deep-learning" : "forensic-signal",
+    source: "local",
+    description: "本地检测模型",
+    weight: id === "npr" ? 0.55 : id === "frequency" ? 0.2 : id === "compression" ? 0.15 : 0.1,
+    available: true,
+  }));
 }
 
 function clampPercent(value: number) {

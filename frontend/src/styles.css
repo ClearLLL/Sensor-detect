@@ -917,3 +917,56 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+.model-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.model-picker label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid rgba(77, 126, 153, 0.34);
+  padding: 6px 8px;
+  color: #dceeff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.model-picker label.disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.model-picker input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--cyan);
+}
+
+.model-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(0, 200, 234, 0.28);
+  background: rgba(0, 200, 234, 0.05);
+}
+
+.model-results div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  color: #9fbad2;
+  font-size: 12px;
+}
+
+.model-results strong {
+  color: var(--cyan);
+  font-size: 13px;
+}

@@ -8,10 +8,12 @@ AI 生成图像检测网站的本地 MVP。
 - React + TypeScript 前端检测页面
 - 上传 PNG / JPEG / WebP / GIF 图片
 - 展示扫描动画、分析进度、AI 生成概率和异常信号
-- 后端默认使用 GitHub 开源 NPR 模型权重进行真实推理
-- 模型不可用时会返回明确错误，`auto` 模式可回退到 demo 结果
+- 后端默认使用多模型综合检测
+- NPR 深度模型加载 GitHub 开源权重进行真实推理
+- 频域残差、压缩痕迹、元数据来源三个本地取证信号模型作为辅助证据
+- 前端支持选择单个模型，也支持选择多个模型综合输出结果
 
-当前接入的模型是 `chuangchuangtan/NPR-DeepfakeDetection`，权重文件为 `backend/models/NPR.pth`。它是基于 Neighboring Pixel Relationships 的深度伪造图像检测模型，适合作为本地 MVP 的真实检测后端起点。
+当前接入的主要深度模型是 `chuangchuangtan/NPR-DeepfakeDetection`，权重文件为 `backend/models/NPR.pth`。它是基于 Neighboring Pixel Relationships 的深度伪造图像检测模型。综合检测会把 NPR 作为主模型，并结合频域、压缩和元数据侧的本地取证信号。
 
 ## 快速启动
 
@@ -69,21 +71,16 @@ npm run build
 
 ## 切换模式
 
-真实模型模式：
+综合检测模式：
 
 ```powershell
-$env:SENSOR_DETECT_MODE="github"
+$env:SENSOR_DETECT_MODE="ensemble"
 $env:SENSOR_DETECT_MODEL="chuangchuangtan/NPR-DeepfakeDetection"
 $env:SENSOR_DETECT_WEIGHTS="backend/models/NPR.pth"
 python backend\app\main.py
 ```
 
-自动回退模式：
-
-```powershell
-$env:SENSOR_DETECT_MODE="auto"
-python backend\app\main.py
-```
+前端会把选择的模型 ID 通过 `models` 表单字段提交给 `/api/detect`，例如：`npr,frequency,compression,metadata`。
 
 演示模式：
 

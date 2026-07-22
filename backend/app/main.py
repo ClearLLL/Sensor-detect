@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import mimetypes
@@ -49,8 +49,13 @@ class SensorDetectHandler(BaseHTTPRequestHandler):
                     "service": "sensor-detect",
                     "mode": DETECTOR.mode,
                     "model": DETECTOR.model_name,
+                    "models": DETECTOR.list_models(),
                 }
             )
+            return
+
+        if path == "/api/models":
+            self._send_json({"ok": True, "models": DETECTOR.list_models()})
             return
 
         if path == "/api/models/current":
@@ -59,6 +64,7 @@ class SensorDetectHandler(BaseHTTPRequestHandler):
                     "mode": DETECTOR.mode,
                     "model": DETECTOR.model_name,
                     "default_model": "chuangchuangtan/NPR-DeepfakeDetection",
+                    "models": DETECTOR.list_models(),
                 }
             )
             return
@@ -113,7 +119,9 @@ class SensorDetectHandler(BaseHTTPRequestHandler):
             width=width,
             height=height,
         )
-        self._send_json(DETECTOR.detect(image_bytes, image_info))
+        fields = upload.get("fields", {})
+        selected_models = _parse_selected_models(fields.get("models") if isinstance(fields, dict) else None)
+        self._send_json(DETECTOR.detect(image_bytes, image_info, selected_models))
 
     def _serve_static(self, request_path: str) -> None:
         if request_path in {"", "/"}:
@@ -162,6 +170,7 @@ class SensorDetectHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         pass
 
+
 def _extract_image_upload(content_type: str, body: bytes) -> dict[str, object]:
     boundary_match = re.search(r"boundary=(?P<boundary>[^;]+)", content_type)
     if not boundary_match:
@@ -169,6 +178,8 @@ def _extract_image_upload(content_type: str, body: bytes) -> dict[str, object]:
 
     boundary = boundary_match.group("boundary").strip().strip('"').encode("utf-8")
     delimiter = b"--" + boundary
+    fields: dict[str, str] = {}
+    upload: dict[str, object] | None = None
 
     for part in body.split(delimiter):
         part = part.strip()
@@ -181,17 +192,31 @@ def _extract_image_upload(content_type: str, body: bytes) -> dict[str, object]:
 
         header_blob, data = part.split(b"\r\n\r\n", 1)
         headers = header_blob.decode("utf-8", errors="replace")
-        if 'name="image"' not in headers:
+        name_match = re.search(r'name="(?P<name>[^"]+)"', headers)
+        if not name_match:
             continue
 
-        filename_match = re.search(r'filename="(?P<filename>[^"]*)"', headers)
-        filename = filename_match.group("filename") if filename_match else "upload"
+        name = name_match.group("name")
         data = data.rstrip(b"\r\n")
-        if not data:
-            raise ValueError("Uploaded image is empty.")
-        return {"filename": filename, "data": data}
+        if name == "image":
+            filename_match = re.search(r'filename="(?P<filename>[^"]*)"', headers)
+            filename = filename_match.group("filename") if filename_match else "upload"
+            if not data:
+                raise ValueError("Uploaded image is empty.")
+            upload = {"filename": filename, "data": data, "fields": fields}
+        else:
+            fields[name] = data.decode("utf-8", errors="replace")
 
-    raise ValueError("No uploaded file named image was found.")
+    if upload is None:
+        raise ValueError("No uploaded file named image was found.")
+    upload["fields"] = fields
+    return upload
+
+
+def _parse_selected_models(value: object) -> list[str] | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def _detect_image_type(data: bytes) -> str | None:
