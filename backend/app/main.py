@@ -3,7 +3,7 @@
 import json
 import mimetypes
 import re
-import sys
+import socket
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,11 +18,15 @@ from services.detector import DetectorService, ImageInfo
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT_DIR / "frontend"
-HOST = "127.0.0.1"
+HOST = "::1"
 PORT = 8000
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 DETECTOR = DetectorService()
+
+
+class IPv6ThreadingHTTPServer(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
 
 
 class SensorDetectHandler(BaseHTTPRequestHandler):
@@ -153,8 +157,7 @@ class SensorDetectHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def log_message(self, format: str, *args: object) -> None:
-        sys.stdout.write("%s - %s\n" % (self.log_date_time_string(), format % args))
-
+        pass
 
 def _extract_image_upload(content_type: str, body: bytes) -> dict[str, object]:
     boundary_match = re.search(r"boundary=(?P<boundary>[^;]+)", content_type)
@@ -243,7 +246,7 @@ def _detect_jpeg_dimensions(data: bytes) -> tuple[int | None, int | None]:
 
 
 def main() -> None:
-    server = ThreadingHTTPServer((HOST, PORT), SensorDetectHandler)
+    server = IPv6ThreadingHTTPServer((HOST, PORT), SensorDetectHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -254,7 +257,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
 
 
