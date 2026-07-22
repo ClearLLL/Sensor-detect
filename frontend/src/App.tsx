@@ -97,7 +97,8 @@ function App() {
     return () => window.clearInterval(timer);
   }, [isAnalyzing]);
 
-  const probability = result ? Math.round(result.ai_probability * 100) : 84;
+  const probabilityValue = result ? clampPercent(result.ai_probability * 100) : 84;
+  const probabilityLabel = result ? formatProbability(result.ai_probability) : "84%";
   const threshold = 70;
   const verdict = useMemo(() => {
     if (!result) return "高概率为 AI 生成";
@@ -246,9 +247,9 @@ function App() {
 
             <div className="result-console">
               <span className="console-label">AI 生成概率</span>
-              <strong className="probability">{probability}%</strong>
+              <strong className="probability">{probabilityLabel}</strong>
               <div className="probability-bar">
-                <i style={{ width: `${probability}%` }} />
+                <i style={{ width: `${probabilityValue}%` }} />
                 <b style={{ left: `${threshold}%` }} />
               </div>
               <div className="bar-scale"><span>0%</span><em>判定阈值 {threshold}%</em><span>100%</span></div>
@@ -338,6 +339,18 @@ function App() {
   );
 }
 
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatProbability(probability: number) {
+  const percent = clampPercent(probability * 100);
+  if (percent > 0 && percent < 0.1) return "<0.1%";
+  if (percent < 100 && percent > 99.9) return ">99.9%";
+  const digits = percent < 10 || percent > 90 ? 1 : 0;
+  return `${percent.toFixed(digits)}%`;
+}
+
 function initialSignals(): Signal[] {
   return [
     { key: "freq", name: "频域异常", value: 84, state: "异常" },
@@ -353,7 +366,7 @@ function previewSignals(file: File): Signal[] {
 }
 
 function resultSignals(file: File, result: DetectResponse): Signal[] {
-  const base = Math.round(result.ai_probability * 100);
+  const base = Math.round(clampPercent(result.ai_probability * 100));
   const seed = file.name.length + Math.round(file.size / 2048);
   return buildSignals(base + (seed % 9) - 4);
 }

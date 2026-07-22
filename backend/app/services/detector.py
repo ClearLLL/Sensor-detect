@@ -141,8 +141,8 @@ class DetectorService:
         warnings: list[str],
         raw_predictions: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        ai_probability = round(float(ai_probability), 4)
-        real_probability = round(float(real_probability), 4)
+        ai_probability = round(float(ai_probability), 6)
+        real_probability = round(float(real_probability), 6)
         result = "likely_ai" if ai_probability >= real_probability else "likely_real"
         confidence_delta = abs(ai_probability - real_probability)
 
