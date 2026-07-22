@@ -210,10 +210,28 @@ function App() {
   function toggleModel(modelId: string) {
     setSelectedModels((current) => {
       if (current.includes(modelId)) {
+        if (current.length === 1) {
+          setMessage("至少保留一个检测模型");
+          return current;
+        }
         return current.filter((id) => id !== modelId);
       }
       return [...current, modelId];
     });
+  }
+
+  function selectAllModels() {
+    const models = (availableModels.length ? availableModels : fallbackModels())
+      .filter((model) => model.available)
+      .map((model) => model.id);
+    if (models.length) setSelectedModels(models);
+  }
+
+  function selectOnlyNpr() {
+    const hasNpr = (availableModels.length ? availableModels : fallbackModels()).some(
+      (model) => model.id === "npr" && model.available,
+    );
+    if (hasNpr) setSelectedModels(["npr"]);
   }
 
   function resetImage() {
@@ -297,6 +315,32 @@ function App() {
             </label>
 
             <div className="result-console">
+              <div className="model-toolbar">
+                <span>检测模型</span>
+                <button type="button" onClick={selectAllModels} disabled={isAnalyzing}>综合检测</button>
+                <button type="button" onClick={selectOnlyNpr} disabled={isAnalyzing}>仅 NPR</button>
+              </div>
+
+              <div className="model-picker" aria-label="选择检测模型">
+                {(availableModels.length ? availableModels : fallbackModels()).map((model) => {
+                  const active = selectedModels.includes(model.id);
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      className={active ? "active" : ""}
+                      title={model.description}
+                      disabled={!model.available || isAnalyzing}
+                      aria-pressed={active}
+                      onClick={() => toggleModel(model.id)}
+                    >
+                      <span>{model.name}</span>
+                      <em>{active ? "已选" : "可选"}</em>
+                    </button>
+                  );
+                })}
+              </div>
+
               <span className="console-label">AI 生成概率</span>
               <strong className="probability">{probabilityLabel}</strong>
               <div className="probability-bar">
@@ -305,20 +349,6 @@ function App() {
               </div>
               <div className="bar-scale"><span>0%</span><em>判定阈值 {threshold}%</em><span>100%</span></div>
               <div className="verdict-line">△ {verdict}</div>
-
-              <div className="model-picker" aria-label="选择检测模型">
-                {(availableModels.length ? availableModels : fallbackModels()).map((model) => (
-                  <label key={model.id} className={model.available ? "" : "disabled"} title={model.description}>
-                    <input
-                      type="checkbox"
-                      checked={selectedModels.includes(model.id)}
-                      disabled={!model.available || isAnalyzing}
-                      onChange={() => toggleModel(model.id)}
-                    />
-                    <span>{model.name}</span>
-                  </label>
-                ))}
-              </div>
 
               {result?.model_results?.length ? (
                 <div className="model-results">
