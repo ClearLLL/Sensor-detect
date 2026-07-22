@@ -1,0 +1,108 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sensor-detect</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <div class="upload-panel">
+          <div class="brand-row">
+            <div>
+              <h1>Sensor-detect</h1>
+              <p>AI 生成图像检测</p>
+            </div>
+            <span id="serviceMode" class="status-pill">检测服务连接中</span>
+          </div>
+
+          <label id="dropZone" class="drop-zone" for="imageInput">
+            <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <span class="drop-icon">+</span>
+            <span class="drop-title">选择或拖入图片</span>
+            <span class="drop-hint">支持 PNG、JPEG、WebP、GIF，单张不超过 10MB</span>
+          </label>
+
+          <div id="previewWrap" class="preview-wrap hidden">
+            <img id="previewImage" alt="待检测图片预览" />
+            <div class="file-meta">
+              <strong id="fileName">-</strong>
+              <span id="fileSize">-</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="detectButton" class="primary-button" disabled>开始检测</button>
+            <button id="clearButton" class="secondary-button" disabled>清空</button>
+          </div>
+        </div>
+
+        <div class="result-panel">
+          <div class="panel-header">
+            <h2>检测结果</h2>
+            <span id="duration">等待上传</span>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            上传图片后，这里会显示 AI 概率、真实图片概率、置信度和模型信息。
+          </div>
+
+          <div id="resultContent" class="hidden">
+            <div class="verdict-row">
+              <div>
+                <span class="eyebrow">判断倾向</span>
+                <strong id="verdict">-</strong>
+              </div>
+              <span id="confidence" class="confidence">-</span>
+            </div>
+
+            <div class="meter-group">
+              <div class="meter-header">
+                <span>AI 生成概率</span>
+                <strong id="aiScoreText">0%</strong>
+              </div>
+              <div class="meter">
+                <span id="aiMeter" style="width: 0%"></span>
+              </div>
+            </div>
+
+            <div class="meter-group">
+              <div class="meter-header">
+                <span>真实图片概率</span>
+                <strong id="realScoreText">0%</strong>
+              </div>
+              <div class="meter real-meter">
+                <span id="realMeter" style="width: 0%"></span>
+              </div>
+            </div>
+
+            <dl class="meta-grid">
+              <div>
+                <dt>检测模式</dt>
+                <dd id="modeText">-</dd>
+              </div>
+              <div>
+                <dt>模型</dt>
+                <dd id="modelText">-</dd>
+              </div>
+              <div>
+                <dt>图片尺寸</dt>
+                <dd id="dimensionText">-</dd>
+              </div>
+              <div>
+                <dt>文件类型</dt>
+                <dd id="typeText">-</dd>
+              </div>
+            </dl>
+
+            <ul id="warnings" class="warnings"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
+
